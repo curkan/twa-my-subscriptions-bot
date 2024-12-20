@@ -49,9 +49,11 @@ async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
                 # ),
                 and_(
                     Subscription.period == 'monthly',
-                    func.date(Subscription.start_at).cast(Date) == today,
-                    func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=1),
-                    func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=2),
+                    or_(
+                        func.date(Subscription.start_at).cast(Date) == today,
+                        func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=1),
+                        func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=2),
+                    ),
                 ),
                 and_(
                     Subscription.period == 'weekly',
