@@ -42,15 +42,16 @@ async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
                 Subscription.latest_notify_at == None
             ),
             or_(
-                and_(
-                    Subscription.period == 'annualy',
-                    extract('month', Subscription.start_at) == today.month - 1,
-                    extract('day', Subscription.start_at) >= today.day - 2
-                ),
+                # and_(
+                #     Subscription.period == 'annualy',
+                #     extract('month', Subscription.start_at) == today.month - 1,
+                #     extract('day', Subscription.start_at) >= today.day - 2
+                # ),
                 and_(
                     Subscription.period == 'monthly',
-                    extract('month', Subscription.start_at) == today.month,
-                    extract('day', Subscription.start_at) >= today.day - 2
+                    func.date(Subscription.start_at).cast(Date) == today,
+                    func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=1),
+                    func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=2),
                 ),
                 and_(
                     Subscription.period == 'weekly',
