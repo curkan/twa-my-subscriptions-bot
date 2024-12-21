@@ -13,6 +13,7 @@ except ImportError:
 
 class BotSettings(BaseModel):
     token: str
+    interval_jobs: int
 
 class PostgresSettings(BaseModel):
     dsn: PostgresDsn

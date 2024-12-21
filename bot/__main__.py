@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f'Привет! Запустите приложение через меню.{update.effective_chat.id}')
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f'Привет! Запустите приложение через меню. О подписках я буду сообщать заранее.')
 
 async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
     engine = create_engine(str(config.postgres.dsn))
@@ -34,7 +34,7 @@ async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     query = select(
         Subscription,
-        (extract('day', Subscription.start_at - today) % 7).label('day_to_start')
+        (extract('day', Subscription.start_at)).label('day_to_start')
     ).filter(
         and_(
             or_(
@@ -50,9 +50,9 @@ async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
                 and_(
                     Subscription.period == 'monthly',
                     or_(
-                        func.date(Subscription.start_at).cast(Date) == today,
-                        func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=1),
-                        func.date(Subscription.start_at).cast(Date) == today + datetime.timedelta(days=2),
+                        func.extract('day', Subscription.start_at) == today.day,
+                        func.extract('day', Subscription.start_at) == (today + datetime.timedelta(days=1)).day,
+                        func.extract('day', Subscription.start_at) == (today + datetime.timedelta(days=2)).day,
                     ),
                 ),
                 and_(
@@ -65,16 +65,18 @@ async def send_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     subs = session.scalars(query)
 
-    notification_service = NotificationService()
-    reply_markup = notification_service.get_notification_keyboard()
+    # notification_service = NotificationService()
+    # reply_markup = notification_service.get_notification_keyboard()
     subs = session.execute(query).all()
 
     for subscription in subs:
         logging.info(f'delta: {subscription[1]}')
-        message = format_subscription_message(subscription[0], subscription[1])
+        today_day = datetime.date.today().day
+
+        message = format_subscription_message(subscription[0], subscription[1] - today_day)
         message = f"*{message}*"
 
-        await context.bot.send_message(chat_id=subscription[0].user_id, text=message, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+        await context.bot.send_message(chat_id=subscription[0].user_id, text=message, parse_mode=ParseMode.MARKDOWN)
         subscription[0].latest_notify_at = datetime.datetime.now(datetime.timezone.utc)
         session.add(subscription[0])
         session.commit()
@@ -99,8 +101,8 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     # application.add_handler(CommandHandler('interval', set_reminder_interval))
     application.add_handler(start_handler)
-    application.add_handler(CallbackQueryHandler(button))
+    # application.add_handler(CallbackQueryHandler(button))
 
-    application.job_queue.run_repeating(send_notifications, interval=300, first=0)
+    application.job_queue.run_repeating(send_notifications, interval=getattr(config.bot, 'interval_jobs', 300), first=0)
     
     application.run_polling()
